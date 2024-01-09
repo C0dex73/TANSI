@@ -48,8 +48,10 @@ class Node :
         for link in self.links :
             link.weight -= 1
             if link.weight == 0:
-                nodes.append(link)
-            
+                nodes.append(link.cross(self))
+                self.links.remove(link)
+        if len(self.links) != 0 : nodes.append(self)
+        return nodes
         
         
 class Link : 
@@ -78,8 +80,9 @@ class Link :
         return str(self.raw)
     
     
-    def cross(self, none:Node) -> Node:
-        pass
+    def cross(self, node:Node) -> Node:
+        if node == self.nodes[0] : return self.nodes[1]
+        else : return self.nodes[0]
 
 
 class Network :
@@ -152,7 +155,7 @@ class Network :
         
         #check for same value or different type
         if nodeA == nodeB : return [nodeA]
-        if type(nodeA) != type(nodeB) : raise TypeError("Expected nodeA and nodeB to be the same type")
+        if type(nodeA) != type(nodeB) : raise TypeError("Expected nodeA and nodeB to be the same type.\r\nnodeA : " + str(type(nodeA)) + " and nodeB : " + str(type(nodeB)))
         
         #if inputed as their name, find the nodes
         if(type(nodeA) == str):
@@ -160,7 +163,10 @@ class Network :
                 if node.name == nodeA : nodeA = node
                 if node.name == nodeB : nodeB = node
         #handle wrong type arguments
-        elif type(nodeA) != Node : raise TypeError("Expected nodeA and nodeB to be string or Node objects")
+        elif type(nodeA) != Node : raise TypeError("Expected nodeA and nodeB to be string or Node objects.\r\nThey are " + str(type(nodeA)))
+        
+        for node in nodeA.tick():
+            print(node)
         
         
     
@@ -170,7 +176,7 @@ def main():
     """The main function called at the start of the program"""
     
     network = Network()
-    network.shortestPath(network.nodes[2], "A")
+    network.shortestPath("A", "B")
 
 #* EXECUTE
 
