@@ -242,6 +242,5 @@ def main():
     network.shortestPath("A", "G")
 
 #* EXECUTE
-
 if(__name__ == '__main__'):
     main()
