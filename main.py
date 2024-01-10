@@ -23,10 +23,12 @@ class Node :
             self.name:str = originalNode.name + ""
             self.links:list[Link] = originalNode.links.copy()
             self.trace:list = originalNode.trace.copy()
+            self.pathWeight:int = originalNode.pathWeight
         else:
             self.name:str = _name
             self.links:list[Link] = []
             self.trace:list = []
+            self.pathWeight:int = 0
             self.backup = Node("", self)
     
     def __str__(self):
@@ -38,7 +40,7 @@ class Node :
         string = string.removesuffix(',') + "\r\n\t]\r\n\t-tracePile : ["
         for node in self.trace:
             string += node.name + ","
-        return string.removesuffix(',') + "]"
+        return string.removesuffix(',') + "]\r\n\t-pathWeight : " + str(self.pathWeight)
     
     def addLink(self, _link, overwriteBackup:bool=False):
         """This function adds a link to this Node instance
@@ -78,17 +80,19 @@ class Node :
         if len(self.links) != 0 : nodes.append(self)
         return nodes
 
-    def traceBack(self, withSelf=True) -> list[str]:
+    def traceBack(self, showWeight:bool=True, withSelf:bool=True) -> list[str]:
         """Trace back the path used to get to this node from the root node
 
         Args:
             withSelf (bool, optional): Return the path with this node at the end. Defaults to True.
+            showWeight (bool, optional): Return the path with the total weight that the path took from the root node to this one\r\nas a string as last element of the list.
 
         Returns:
             list[str]: The path, list of the name of the nodes
         """
         path = [node.name for node in self.trace]
         if withSelf : path.append(self.name)
+        if showWeight : path.append(str(self.pathWeight))
         return path
 
 
@@ -107,7 +111,7 @@ class Link :
         #set class variables
         self.nodes:list[Node] = _nodes
         self.weight:int = _weigth
-        self.raw:str = str(_raw)
+        self.raw:tuple[str, int, str] = _raw
         
         #add this link to the bound nodes
         self.nodes[0].addLink(self, True)
@@ -118,14 +122,34 @@ class Link :
         return str(self.raw)
     
     def cross(self, node:Node, useBackup:bool=False) -> Node:
+        """Return the other node of the link than the node inputed in argument
+
+        Args:
+            node (Node): The node that want to cross the link
+            useBackup (bool, optional): If the other node is or was already processed from another path\r\nuse it's backup to have a fresh node like at initialization.\r\nDefaults to False.
+
+        Returns:
+            Node: The node from the other side
+        """
+        #get the other node
         if node == self.nodes[0] : target = self.nodes[1]
         else : target = self.nodes[0]
-        if len(target.trace) != 0: return [None, target.backup][useBackup]
+        #chose whether or not to use backup if node already processed
+        if(len(target.trace) != 0):
+            if not useBackup : return None
+            target = target.backup
+        #return the node and set its tracing system according to the one of the current node.
         target.trace = node.trace.copy()
         target.trace.append(node)
+        target.pathWeight = node.pathWeight + self.raw[1]
         return target
     
     def tick(self) -> bool:
+        """decrease the weight, if it is ready to be crossed (weight==0) then remove it from its nodes\r\n(both to avoid goings and comings along a single link)
+
+        Returns:
+            bool: whether or not it is ready to be crossed
+        """
         self.weight -= 1
         if self.weight > 0 : return False
         for node in self.nodes : node.removeLink(self)
@@ -143,6 +167,9 @@ class Network :
         self.nodes:list[Node] = []
         self.links:list[Link] = []
         
+        #setup the root node, used to avoid going back and forth between the first node and a second one when pathfinding
+        self.root = Node("root")
+        
         #extract config file into the variables
         for link in cfg:
             self.links.append(self.processLink(link))
@@ -156,13 +183,14 @@ class Network :
         Returns:
             Node: The pulled node
         """
-        
+        #if it already exists return it as node object
         for node in self.nodes:
             if node.name == name : return node
+        #otherwise create it and return it
         newNode = Node(name)
         self.nodes.append(newNode)
         return newNode
-
+    
     def processLink(self, link:tuple[str, int, str]) -> Link:
         """Transform the config Link from a tuple to an object
 
@@ -213,6 +241,9 @@ class Network :
         #handle wrong type arguments
         elif type(nodeA) != Node : raise TypeError("Expected nodeA and nodeB to be string or Node objects.\r\nThey are " + str(type(nodeA)))
 
+        #tag nodeA as root
+        nodeA.trace = [self.root]
+        
         # list of the nodes processed in the current tick
         toTick:list[Node] = [nodeA]
         # list of the nodes to process in the following tick
@@ -220,6 +251,7 @@ class Network :
         
         #~ main loop
         while nodeB not in toTick:
+            #debug(toTick)
             for node in toTick:
                 nextTT.extend(node.tick())
             #remove duplicates and assign the nodes to be processed in the next iteration
@@ -228,12 +260,19 @@ class Network :
         #print result
         print(nodeB.traceBack())
 
+def debug(list:list[Node]):
+    for node in list:
+        print(str(node))
+    input()
+
 #* main program
 def main():
     """The main function called at the start of the program"""
-    
+    #initialize the network
     network = Network()
-    network.shortestPath("A", "G")
+    
+    #search for the shortest path between nodes "A" and "G"
+    network.shortestPath("A", "C")
 
 #* EXECUTE
 if(__name__ == '__main__'):
