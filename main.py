@@ -228,12 +228,6 @@ class Network :
         #print result
         print(nodeB.traceBack())
 
-#! DEBUG
-def debug(list:list[Node]):
-    for node in list:
-        print(str(node))
-    input()
-
 #* main program
 def main():
     """The main function called at the start of the program"""
