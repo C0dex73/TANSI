@@ -8,43 +8,38 @@ from typing import overload
 class Node :
     """This class representes a node in the network"""
 
-    @overload
-    def __init__(self, originalNode):
-        """This function copies the original node into another instance
-
-        Args:
-            originalNode (Node): The node to copy
-        """
-
     def __init__(self, _name:str, originalNode=None):
-        """This function initializes a node object
+        """This function initializes a node object, or create a copy of another if originalNode is not None
 
         Args:
-            _name (str): The name of this node
-            originalNode (Node): used in the overloaded function. Try Node(originalNode:Node). Default to None
+            _name (str): The name of this node (ignored if originalNode is not None)
+            originalNode (Node): The node to copy if not None. Default to None
         """
         
         #set class variables
         self.isBackup:bool = originalNode is not None
         if(self.isBackup):
-            self.name:str = originalNode.name
-            self.links:list[Link] = originalNode.links
-            self.trace:list = originalNode.trace
+            #* used + "" and .copy() to separate the two objects
+            self.name:str = originalNode.name + ""
+            self.links:list[Link] = originalNode.links.copy()
+            self.trace:list = originalNode.trace.copy()
         else:
-            self.backup = Node(self)
             self.name:str = _name
             self.links:list[Link] = []
             self.trace:list = []
-            
-        
+            self.backup = Node("", self)
+    
     def __str__(self):
         """This function create the string printed when printing an object of this class"""
         
         string = "Node :\r\n\t-name : " + self.name + "\r\n\t-links : ["
         for link in self.links:
-            string += "\r\n\t\t" + str(link) + ","
-        return string.removesuffix(',') + "\r\n\t]"
-        
+            string += "\r\n\t\t" + str(link) + "[" + str(link.weight )+"]" + ","
+        string = string.removesuffix(',') + "\r\n\t]\r\n\t-tracePile : ["
+        for node in self.trace:
+            string += node.name + ","
+        return string.removesuffix(',') + "]"
+    
     def addLink(self, _link, overwriteBackup:bool=False):
         """This function adds a link to this Node instance
 
@@ -66,8 +61,7 @@ class Node :
         
         self.links.remove(_link)
         if overwriteBackup and not self.isBackup: self.backup.links.remove(_link)
-    
-    
+
     def tick(self) -> list:
         """decreases the weight of links until they are to 0 then return the bound node
 
@@ -83,8 +77,21 @@ class Node :
                 if nodes[len(nodes)-1] is None : nodes.pop() #In case it's a dead-end
         if len(self.links) != 0 : nodes.append(self)
         return nodes
-        
-        
+
+    def traceBack(self, withSelf=True) -> list[str]:
+        """Trace back the path used to get to this node from the root node
+
+        Args:
+            withSelf (bool, optional): Return the path with this node at the end. Defaults to True.
+
+        Returns:
+            list[str]: The path, list of the name of the nodes
+        """
+        path = [node.name for node in self.trace]
+        if withSelf : path.append(self.name)
+        return path
+
+
 class Link : 
     """This class represents a link in the network"""
 
@@ -105,17 +112,16 @@ class Link :
         #add this link to the bound nodes
         self.nodes[0].addLink(self, True)
         self.nodes[1].addLink(self, True)
-        
+    
     def __str__(self):
         """This function create the string printed when printing an object of this class"""
         return str(self.raw)
-    
     
     def cross(self, node:Node, useBackup:bool=False) -> Node:
         if node == self.nodes[0] : target = self.nodes[1]
         else : target = self.nodes[0]
         if len(target.trace) != 0: return [None, target.backup][useBackup]
-        target.trace = node.trace
+        target.trace = node.trace.copy()
         target.trace.append(node)
         return target
     
@@ -127,6 +133,8 @@ class Link :
 
 
 class Network :
+    """This class represents the network itself and provides memthods to operate it"""
+    
     def __init__(self) :
         """The network class contains all the components of the program.\r\n
         It also provides functions to process them
@@ -154,7 +162,6 @@ class Network :
         newNode = Node(name)
         self.nodes.append(newNode)
         return newNode
-
 
     def processLink(self, link:tuple[str, int, str]) -> Link:
         """Transform the config Link from a tuple to an object
@@ -206,17 +213,33 @@ class Network :
         #handle wrong type arguments
         elif type(nodeA) != Node : raise TypeError("Expected nodeA and nodeB to be string or Node objects.\r\nThey are " + str(type(nodeA)))
 
-        #TODO : loop
+        # list of the nodes processed in the current tick
+        toTick:list[Node] = [nodeA]
+        # list of the nodes to process in the following tick
+        nextTT:list[Node] = []
         
+        #~ main loop
+        while nodeB not in toTick:
+            for node in toTick:
+                nextTT.extend(node.tick())
+            #remove duplicates and assign the nodes to be processed in the next iteration
+            toTick = list(set(nextTT))
         
-    
+        #print result
+        print(nodeB.traceBack())
+
+#! DEBUG
+def debug(list:list[Node]):
+    for node in list:
+        print(str(node))
+    input()
 
 #* main program
 def main():
     """The main function called at the start of the program"""
     
     network = Network()
-    network.shortestPath("A", "B")
+    network.shortestPath("A", "G")
 
 #* EXECUTE
 
