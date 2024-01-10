@@ -2,18 +2,15 @@
 
 
 configList = [
-    ("A", 2, "B"),
-    ("C", 1, "A"),
-    ("B", 2, "C"),
-    ("B", 3, "E"),
-    ("E", 3, "C"),
-    ("E", 1, "F"),
-    ("F", 5, "C"),
-    ("C", 4, "D"),
-    ("B", 1, "D"),
-    ("F", 6, "D"),
-    ("E", 3, "D"),
-    ("F", 2, "G"),
-    ("D", 5, "G")
+    ("A", 1, "B"),
+    ("A", 4, "C"),
+    ("B", 2, "C")
 ]
-"""current network architecture represented as a list of tuples (thoses are links)"""
+"""
+current network architecture represented as a list of tuples (thoses are links).\r\n
+default to [\r\n\t
+    ("A", 1, "B"),\r\n\t
+    ("A", 4, "C"),\r\n\t
+    ("B", 2, "C")\n\n
+]
+"""
