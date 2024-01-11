@@ -19,7 +19,7 @@ class Node :
         #set class variables
         self.isBackup:bool = originalNode is not None
         if(self.isBackup):
-            #* used + "" and .copy() to separate the two objects
+            #* used + "" and .copy() to separate the new backup from his original version
             self.name:str = originalNode.name + ""
             self.links:list[Link] = originalNode.links.copy()
             self.trace:list = originalNode.trace.copy()
@@ -41,6 +41,14 @@ class Node :
         for node in self.trace:
             string += node.name + ","
         return string.removesuffix(',') + "]\r\n\t-pathWeight : " + str(self.pathWeight)
+    
+    def getBackup(self):
+        """Returns a backup of this class from the initialization of the network
+
+        Returns:
+            Node: The node's backup
+        """
+        return Node("", self.backup)
     
     def addLink(self, _link, overwriteBackup:bool=False):
         """This function adds a link to this Node instance
@@ -64,19 +72,27 @@ class Node :
         self.links.remove(_link)
         if overwriteBackup and not self.isBackup: self.backup.links.remove(_link)
 
-    def tick(self) -> list:
+    def tick(self, useLinksBackup:bool=False) -> list:
         """decreases the weight of links until they are to 0 then return the bound node
 
         Returns:
             list[Node]: The list of the nodes to tick next time
         """
+        
+        #TODO : get nodes removed from list
+        
         #list the new nodes reached by the algorithm
         nodes:list[Node|None] = []
-        for link in self.links : 
-            #if the link is crossed
+        i:int = 0
+        while i < len(self.links):
+            link = self.links[i]
+            #if the link is already crossed use his backup
+            if link.crossed and useLinksBackup: link = link.getBackup()
+            #if we are crossing it, fetch the next node
             if(link.tick()):
                 nodes.append(link.cross(self))
                 if nodes[len(nodes)-1] is None : nodes.pop() #In case it's a dead-end
+            i += 1
         if len(self.links) != 0 : nodes.append(self)
         return nodes
 
@@ -99,23 +115,37 @@ class Node :
 class Link : 
     """This class represents a link in the network"""
 
-    def __init__(self, _nodes:list[Node], _weigth:int, _raw:tuple[str, int, str]):
+    def __init__(self, _nodes:list[Node], _weigth:int, _raw:tuple[str, int, str], originalLink=None):
         """This function initializes a link object
 
         Args:
             _nodes (Node[2]): The two nodes bound by this link
             _weight (int): The weight of the node, a greater weight means that it takes longer to pass through the link
             _raw (tuple[str, int, str]): The link as it is in the config file
+            originalLink (Link|None, optional): the link to copy in case of backup (let Nonde if it is not a backup) (same mecanic as Node's backups)
         """
         
-        #set class variables
-        self.nodes:list[Node] = _nodes
-        self.weight:int = _weigth
-        self.raw:tuple[str, int, str] = _raw
+        self.isBackup = originalLink is not None
+        self.crossed = False
+        if(self.isBackup):
+            #set class variables
+            self.nodes:list[Node] = originalLink.nodes
+            self.weight:int = originalLink.weight
+            self.raw:tuple[str, int, str] = originalLink.raw
+        else:
+            #set class variables
+            self.nodes:list[Node] = _nodes
+            self.weight:int = _weigth
+            self.raw:tuple[str, int, str] = _raw
+            
+            #add this link to the bound nodes
+            self.nodes[0].addLink(self, True)
+            self.nodes[1].addLink(self, True)
+
+            #init backup
+            self.backup = Link(None, None, None, self)
         
-        #add this link to the bound nodes
-        self.nodes[0].addLink(self, True)
-        self.nodes[1].addLink(self, True)
+        
     
     def __str__(self):
         """This function create the string printed when printing an object of this class"""
@@ -134,10 +164,12 @@ class Link :
         #get the other node
         if node == self.nodes[0] : target = self.nodes[1]
         else : target = self.nodes[0]
+        #avoid looping
+        if node.trace.__contains__(target) : return None
         #chose whether or not to use backup if node already processed
         if(len(target.trace) != 0):
             if not useBackup : return None
-            target = target.backup
+            target = target.getBackup()
         #return the node and set its tracing system according to the one of the current node.
         target.trace = node.trace.copy()
         target.trace.append(node)
@@ -153,7 +185,18 @@ class Link :
         self.weight -= 1
         if self.weight > 0 : return False
         for node in self.nodes : node.removeLink(self)
+        self.crossed = True
         return True
+    
+    
+    def getBackup(self):
+        """Returns a backup of this class from the initialization of the network
+
+        Returns:
+            Link: The link's backup
+        """
+        return Link(None, None, None, self.backup)
+
 
 
 class Network :
@@ -231,15 +274,9 @@ class Network :
         
         #check for same value or different type
         if nodeA == nodeB : return [nodeA]
-        if type(nodeA) != type(nodeB) : raise TypeError("Expected nodeA and nodeB to be the same type.\r\nnodeA : " + str(type(nodeA)) + " and nodeB : " + str(type(nodeB)))
         
-        #if inputed as their name, find the nodes
-        if(type(nodeA) == str):
-            for node in self.nodes :
-                if node.name == nodeA : nodeA = node
-                if node.name == nodeB : nodeB = node
-        #handle wrong type arguments
-        elif type(nodeA) != Node : raise TypeError("Expected nodeA and nodeB to be string or Node objects.\r\nThey are " + str(type(nodeA)))
+        #get the nodes into node type objects
+        nodeA, nodeB = self.formatNodes(nodeA, nodeB)
 
         #tag nodeA as root
         nodeA.trace = [self.root]
@@ -251,14 +288,71 @@ class Network :
         
         #~ main loop
         while nodeB not in toTick:
-            #debug(toTick)
+            #!debug(toTick)
             for node in toTick:
                 nextTT.extend(node.tick())
             #remove duplicates and assign the nodes to be processed in the next iteration
             toTick = list(set(nextTT))
+            #!debug(toTick)
         
-        #print result
-        print(nodeB.traceBack())
+        return(nodeB.traceBack())
+    
+    #overload with string arguments for the IDEs
+    @overload
+    def longestPath(self, nodeA:str, nodeB:str) -> list[Node] :
+        """Find the longest path between two nodes.\r\nSlower than longestPath(self, nodeA:Node, nodeB:Node) -> list[Node] :.
+
+        Args:
+            nodeA (str) and nodeB (str): The two nodes to bind
+
+        Returns:
+            list[Node]: the nodes that form the path
+        """
+    
+    def longestPath(self, nodeA:Node, nodeB:Node) -> list[Node]:
+        #check for same value or different type
+        if nodeA == nodeB : return [nodeA]
+        
+        #get the nodes into node type objects
+        nodeA, nodeB = self.formatNodes(nodeA, nodeB)
+        
+        #tag nodeA as root
+        nodeA.trace = [self.root]
+        
+        # list of the nodes processed in the current tick
+        toTick:list[Node] = [nodeA]
+        # list of the nodes to process in the following tick
+        nextTT:list[Node] = []
+        
+        finalResult:list[str] = []
+        
+        #~ main loop
+        while len(toTick) > 0:
+            debug(toTick)
+            for node in toTick:
+                nextTT.extend(node.tick())
+            #remove duplicates and assign the nodes to be processed in the next iteration
+            #!debug(nextTT)
+            for node in nextTT:
+                if(node.name == nodeB.name and len(node.traceBack()) > len(finalResult)):
+                    nextTT.remove(node)
+                    finalResult = node.traceBack()
+            toTick = list(set(nextTT))
+            #!debug(toTick)
+        return finalResult
+    
+    def formatNodes(self, nodeA:Node, nodeB:Node) -> tuple[Node, Node]:
+        if type(nodeA) != type(nodeB) : raise TypeError("Expected nodeA and nodeB to be the same type.\r\nnodeA : " + str(type(nodeA)) + " and nodeB : " + str(type(nodeB)))
+        
+        #if inputed as their name, find the nodes
+        if(type(nodeA) == str):
+            for node in self.nodes :
+                if node.name == nodeA : nodeA = node
+                if node.name == nodeB : nodeB = node
+        #handle wrong type arguments
+        elif type(nodeA) != Node : raise TypeError("Expected nodeA and nodeB to be string or Node objects.\r\nThey are " + str(type(nodeA)))
+        return nodeA, nodeB
+        
 
 def debug(list:list[Node]):
     for node in list:
@@ -271,8 +365,11 @@ def main():
     #initialize the network
     network = Network()
     
-    #search for the shortest path between nodes "A" and "G"
-    network.shortestPath("A", "C")
+    #search for the shortest path between nodes "A" and "C"
+    #print(network.shortestPath("A", "C"))
+    
+    #search for the longest path between nodes "A" and "C"
+    print(network.longestPath("A", "C"))
 
 #* EXECUTE
 if(__name__ == '__main__'):
