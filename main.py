@@ -72,14 +72,12 @@ class Node :
         self.links.remove(_link)
         if overwriteBackup and not self.isBackup: self.backup.links.remove(_link)
 
-    def tick(self, useLinksBackup:bool=False) -> list:
+    def tick(self, useLinksBackup:bool=False, useNodeBackup:bool=False) -> list:
         """decreases the weight of links until they are to 0 then return the bound node
 
         Returns:
             list[Node]: The list of the nodes to tick next time
         """
-        
-        #TODO : get nodes removed from list
         
         #list the new nodes reached by the algorithm
         nodes:list[Node|None] = []
@@ -90,7 +88,9 @@ class Node :
             if link.crossed and useLinksBackup: link = link.getBackup()
             #if we are crossing it, fetch the next node
             if(link.tick()):
-                nodes.append(link.cross(self))
+                #substract one to add one instead of 0at the en of the iteration
+                i -= 1
+                nodes.append(link.cross(self, useNodeBackup))
                 if nodes[len(nodes)-1] is None : nodes.pop() #In case it's a dead-end
             i += 1
         if len(self.links) != 0 : nodes.append(self)
@@ -115,7 +115,7 @@ class Node :
 class Link : 
     """This class represents a link in the network"""
 
-    def __init__(self, _nodes:list[Node], _weigth:int, _raw:tuple[str, int, str], originalLink=None):
+    def __init__(self, _nodes:list[Node], _weight:int, _raw:tuple[str, int, str], originalLink=None):
         """This function initializes a link object
 
         Args:
@@ -135,7 +135,7 @@ class Link :
         else:
             #set class variables
             self.nodes:list[Node] = _nodes
-            self.weight:int = _weigth
+            self.weight:int = _weight
             self.raw:tuple[str, int, str] = _raw
             
             #add this link to the bound nodes
@@ -328,17 +328,30 @@ class Network :
         
         #~ main loop
         while len(toTick) > 0:
-            debug(toTick)
+            #!debug(toTick, "tT")
+            print()
             for node in toTick:
-                nextTT.extend(node.tick())
+                nextTT.extend(node.tick(useNodeBackup=True))
             #remove duplicates and assign the nodes to be processed in the next iteration
-            #!debug(nextTT)
+            print()
+            #!debug(nextTT, "TT")
             for node in nextTT:
-                if(node.name == nodeB.name and len(node.traceBack()) > len(finalResult)):
+                #if the name matches (could be bakckups and names are unique)
+                if(node.name == nodeB.name):
                     nextTT.remove(node)
-                    finalResult = node.traceBack()
+                    traceBack = node.traceBack()
+                    #safe parse
+                    try:
+                        #compare path weight
+                        if(int(traceBack[len(traceBack)-1]) > (int(finalResult[len(finalResult)-1])if len(finalResult) > 0 else 0)):
+                            finalResult = traceBack
+                    except Exception as e:
+                        print("Oops, an error occurred while parsing the path weight : " + str(e))
+                    
+                    
+            #init toTick for next iteration and empty nextTT
             toTick = list(set(nextTT))
-            #!debug(toTick)
+            nextTT = []
         return finalResult
     
     def formatNodes(self, nodeA:Node, nodeB:Node) -> tuple[Node, Node]:
@@ -354,7 +367,8 @@ class Network :
         return nodeA, nodeB
         
 
-def debug(list:list[Node]):
+def debug(list:list[Node], calledFrom:str=""):
+    print(("#debug from " + calledFrom) if calledFrom!="" else "#debug")
     for node in list:
         print(str(node))
     input()
