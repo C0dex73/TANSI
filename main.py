@@ -217,6 +217,10 @@ class Network :
         for link in cfg:
             self.links.append(self.processLink(link))
 
+    def reset(self):
+        """Resets the network class, call __init__ function"""
+        self.__init__()
+
     def pullNode(self, name) -> Node:
         """Return the corresponding node and create a new if it doesn't exist
 
@@ -310,6 +314,14 @@ class Network :
         """
     
     def longestPath(self, nodeA:Node, nodeB:Node) -> list[Node]:
+        """Find the longest path between two nodes
+
+        Args:
+            nodeA (Node) and nodeB (Node): The two nodes to bind
+
+        Returns:
+            list[Node]: the nodes that form the path
+        """
         #check for same value or different type
         if nodeA == nodeB : return [nodeA]
         
@@ -329,11 +341,9 @@ class Network :
         #~ main loop
         while len(toTick) > 0:
             #!debug(toTick, "tT")
-            print()
             for node in toTick:
                 nextTT.extend(node.tick(useNodeBackup=True))
             #remove duplicates and assign the nodes to be processed in the next iteration
-            print()
             #!debug(nextTT, "TT")
             for node in nextTT:
                 #if the name matches (could be bakckups and names are unique)
@@ -355,6 +365,19 @@ class Network :
         return finalResult
     
     def formatNodes(self, nodeA:Node, nodeB:Node) -> tuple[Node, Node]:
+        """Format a two nodes as two nodes or two strings into their respective node objects
+
+        Args:
+            nodeA (Node): the first node to parse
+            nodeB (Node): the second one
+
+        Raises:
+            TypeError: Raised when node a and b arn't the same type
+            TypeError: Raised when node a or b arn't string or node
+
+        Returns:
+            tuple[Node, Node]: the two nodes as node objects
+        """
         if type(nodeA) != type(nodeB) : raise TypeError("Expected nodeA and nodeB to be the same type.\r\nnodeA : " + str(type(nodeA)) + " and nodeB : " + str(type(nodeB)))
         
         #if inputed as their name, find the nodes
@@ -368,6 +391,12 @@ class Network :
         
 
 def debug(list:list[Node], calledFrom:str=""):
+    """used while debugging the project, shows a list of nodes as their own string representations
+
+    Args:
+        list (list[Node]): The list of node to display
+        calledFrom (str, optional): Shows in the console an optional message to say where it was called from. Defaults to "".
+    """
     print(("#debug from " + calledFrom) if calledFrom!="" else "#debug")
     for node in list:
         print(str(node))
@@ -380,7 +409,10 @@ def main():
     network = Network()
     
     #search for the shortest path between nodes "A" and "C"
-    #print(network.shortestPath("A", "C"))
+    print(network.shortestPath("A", "C"))
+    
+    #reset network
+    network.reset()
     
     #search for the longest path between nodes "A" and "C"
     print(network.longestPath("A", "C"))
